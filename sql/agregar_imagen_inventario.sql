@@ -1,0 +1,1 @@
+ALTER TABLE inventario ADD COLUMN imagen VARCHAR(255) DEFAULT 'default.jpg'; 
