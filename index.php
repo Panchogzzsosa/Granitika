@@ -1,3 +1,8 @@
+<?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -245,26 +250,26 @@
                                     <thead>
                                         <tr>
                                             <th>Producto</th>
-                                            <th>Stock Actual</th>
+                                            <th>Cantidad Actual</th>
                                             <th>Stock Mínimo</th>
                                             <th>Estado</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <?php
-                                        $query = "SELECT nombre, stock, stock_minimo, estado 
+                                        $query = "SELECT nombre, cantidad, stock_minimo, estado 
                                                  FROM inventario 
-                                                 WHERE stock <= stock_minimo 
-                                                 ORDER BY stock ASC LIMIT 5";
+                                                 WHERE cantidad <= stock_minimo 
+                                                 ORDER BY cantidad ASC LIMIT 5";
                                         $result = $conn->query($query);
                                         while($row = $result->fetch_assoc()) {
-                                            $estadoClass = $row['stock'] == 0 ? 'danger' : 'warning';
+                                            $estadoClass = $row['cantidad'] == 0 ? 'danger' : 'warning';
                                             echo "<tr>";
                                             echo "<td>" . $row['nombre'] . "</td>";
-                                            echo "<td>" . $row['stock'] . "</td>";
+                                            echo "<td>" . $row['cantidad'] . "</td>";
                                             echo "<td>" . $row['stock_minimo'] . "</td>";
                                             echo "<td><span class='badge bg-$estadoClass'>" . 
-                                                 ($row['stock'] == 0 ? 'Agotado' : 'Bajo Stock') . 
+                                                 ($row['cantidad'] == 0 ? 'Agotado' : 'Bajo Stock') . 
                                                  "</span></td>";
                                             echo "</tr>";
                                         }
@@ -279,75 +284,238 @@
         </div>
     </main>
 
-    <!-- Botón flotante del chatbot -->
-    <button id="chatbot-boton"
-      style="position:fixed;bottom:24px;right:24px;z-index:99999;background:#0088cc;color:#fff;border:none;border-radius:50%;width:56px;height:56px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.2);font-size:2rem;cursor:pointer;">
-      <i class="bi bi-robot"></i>
-    </button>
+    <!-- Chatbot -->
+    <div id="chatbot-container" style="position:fixed;bottom:20px;right:20px;z-index:999999;">
+        <!-- Botón del chatbot -->
+        <button id="chatbot-toggle" style="
+            width:70px;
+            height:70px;
+            border-radius:50%;
+            background:#0088cc;
+            border:none;
+            color:white;
+            font-size:28px;
+            cursor:pointer;
+            box-shadow:0 4px 15px rgba(0,0,0,0.3);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            transition:all 0.3s ease;
+            position:relative;
+        "
+        title="Haz clic para chatear con el asistente">
+            <i class="bi bi-robot"></i>
+            <span style="
+                position:absolute;
+                bottom:-25px;
+                left:50%;
+                transform:translateX(-50%);
+                background:rgba(0,0,0,0.8);
+                color:white;
+                padding:4px 8px;
+                border-radius:4px;
+                font-size:12px;
+                white-space:nowrap;
+                opacity:0;
+                transition:opacity 0.3s;
+                pointer-events:none;
+            ">Haz clic para chatear</span>
+        </button>
 
-    <button style="position:fixed;bottom:10px;right:10px;z-index:99999;background:red;color:white;">PRUEBA</button>
+        <!-- Ventana del chat -->
+        <div id="chatbot-window" style="
+            position:absolute;
+            bottom:80px;
+            right:0;
+            width:350px;
+            height:450px;
+            background:white;
+            border-radius:15px;
+            box-shadow:0 5px 25px rgba(0,0,0,0.2);
+            display:none;
+            flex-direction:column;
+        ">
+            <!-- Encabezado -->
+            <div style="
+                padding:15px 20px;
+                background:#0088cc;
+                color:white;
+                border-radius:15px 15px 0 0;
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+            ">
+                <span style="font-weight:bold;font-size:1.1rem;">Granatika Bot</span>
+                <button id="chatbot-close" style="
+                    background:none;
+                    border:none;
+                    color:white;
+                    cursor:pointer;
+                    font-size:24px;
+                    padding:0;
+                    width:30px;
+                    height:30px;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                ">×</button>
+            </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="assets/js/main.js"></script>
+            <!-- Mensajes -->
+            <div id="chatbot-messages" style="
+                flex:1;
+                padding:20px;
+                overflow-y:auto;
+                background:#f5f7fa;
+            ">
+                <div style="
+                    background:#e5eaf1;
+                    padding:12px 16px;
+                    border-radius:15px;
+                    margin-bottom:15px;
+                    max-width:85%;
+                    font-size:0.95rem;
+                    line-height:1.4;
+                ">
+                    ¡Hola! 👋 Soy tu asistente Granatika. Puedes preguntarme cosas como:<br>
+                    - ¿Cuánto stock hay de [producto]?<br>
+                    - ¿Qué productos están agotados?<br>
+                    - ¿Cuántos productos hay en inventario?<br>
+                    - ¿Quién fue el último cliente?<br>
+                    - ¿Cuáles son mis ventas?<br>
+                    - ¿Cuánto le he vendido a [cliente]?<br>
+                    - ¿A quién le vendí?<br>
+                    ¡Hazme una pregunta!
+                </div>
+            </div>
+
+            <!-- Formulario de entrada -->
+            <form id="chatbot-form" style="
+                padding:15px 20px;
+                background:white;
+                border-top:1px solid #eee;
+                display:flex;
+                gap:10px;
+            ">
+                <input type="text" id="chatbot-input" placeholder="Escribe tu pregunta..." style="
+                    flex:1;
+                    padding:10px 15px;
+                    border:1px solid #ddd;
+                    border-radius:8px;
+                    font-size:0.95rem;
+                " required>
+                <button type="submit" style="
+                    background:#0088cc;
+                    color:white;
+                    border:none;
+                    padding:10px 15px;
+                    border-radius:8px;
+                    cursor:pointer;
+                    font-size:1.1rem;
+                ">
+                    <i class="bi bi-send"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <style>
+    /* Forzar visibilidad de todos los elementos fijos */
+    *[style*="position:fixed"],
+    *[style*="position: fixed"] {
+      z-index: 2147483647 !important;
+      display: block !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+    </style>
+
     <script>
-    // Gráfico de Ventas por Tipo de Material
-    const ventasCtx = document.getElementById('ventasChart').getContext('2d');
-    const ventasChart = new Chart(ventasCtx, {
-        type: 'line',
-        data: {
-            labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
-            datasets: [{
-                label: 'Ventas Totales',
-                data: [12000, 19000, 15000, 25000, 22000, 30000],
-                borderColor: 'rgb(75, 192, 192)',
-                tension: 0.1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                }
-            }
-        }
-    });
+    // Chatbot
+    document.addEventListener('DOMContentLoaded', function() {
+        const chatbotToggle = document.getElementById('chatbot-toggle');
+        const chatbotWindow = document.getElementById('chatbot-window');
+        const chatbotClose = document.getElementById('chatbot-close');
+        const chatbotForm = document.getElementById('chatbot-form');
+        const chatbotInput = document.getElementById('chatbot-input');
+        const chatbotMessages = document.getElementById('chatbot-messages');
 
-    // Gráfico de Distribución de Ventas
-    const ventasPieCtx = document.getElementById('ventasPieChart').getContext('2d');
-    const ventasPieChart = new Chart(ventasPieCtx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Granito', 'Mármol', 'Cuarzo', 'Otros'],
-            datasets: [{
-                data: [40, 30, 20, 10],
-                backgroundColor: [
-                    'rgb(255, 99, 132)',
-                    'rgb(54, 162, 235)',
-                    'rgb(255, 205, 86)',
-                    'rgb(75, 192, 192)'
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
-            }
-        }
-    });
+        // Mostrar tooltip al hover
+        chatbotToggle.addEventListener('mouseenter', function() {
+            this.querySelector('span').style.opacity = '1';
+        });
+        chatbotToggle.addEventListener('mouseleave', function() {
+            this.querySelector('span').style.opacity = '0';
+        });
 
-    // Filtros de fecha
-    document.querySelectorAll('[data-chart-period]').forEach(button => {
-        button.addEventListener('click', function() {
-            const period = this.dataset.chartPeriod;
-            // Aquí iría la lógica para actualizar los datos según el período
-            console.log('Cambiando período a:', period);
+        // Mostrar/ocultar ventana
+        chatbotToggle.addEventListener('click', () => {
+            chatbotWindow.style.display = 'flex';
+            chatbotInput.focus();
+        });
+
+        chatbotClose.addEventListener('click', () => {
+            chatbotWindow.style.display = 'none';
+        });
+
+        // Enviar mensaje
+        chatbotForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const message = chatbotInput.value.trim();
+            if (!message) return;
+
+            // Agregar mensaje del usuario
+            addMessage(message, 'user');
+            chatbotInput.value = '';
+
+            // Enviar al backend
+            fetch('api/chatbot.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pregunta: message })
+            })
+            .then(res => res.json())
+            .then(data => {
+                addMessage(data.respuesta, 'bot');
+            })
+            .catch(() => {
+                addMessage('Lo siento, hubo un error al procesar tu consulta.', 'bot');
+            });
+        });
+
+        // Función para agregar mensajes
+        function addMessage(text, type) {
+            const div = document.createElement('div');
+            div.style.cssText = `
+                padding: 12px 16px;
+                border-radius: 15px;
+                margin-bottom: 15px;
+                max-width: 85%;
+                word-wrap: break-word;
+                font-size: 0.95rem;
+                line-height: 1.4;
+                ${type === 'user' ? `
+                    background: #0088cc;
+                    color: white;
+                    margin-left: auto;
+                    border-radius: 15px 15px 0 15px;
+                ` : `
+                    background: #e5eaf1;
+                    color: #333;
+                    margin-right: auto;
+                    border-radius: 15px 15px 15px 0;
+                `}
+            `;
+            div.textContent = text;
+            chatbotMessages.appendChild(div);
+            chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+        }
+
+        // Cerrar al hacer clic fuera
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#chatbot-container')) {
+                chatbotWindow.style.display = 'none';
+            }
         });
     });
     </script>
